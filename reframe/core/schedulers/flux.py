@@ -6,7 +6,8 @@
 #
 # Flux-Framework backend
 #
-# - Initial version submitted by Vanessa Sochat, Lawrence Livermore National Lab
+# - Initial version submitted by Vanessa Sochat,
+#   Lawrence Livermore National Lab
 #
 
 import os
@@ -28,15 +29,15 @@ except ImportError:
 else:
     error = None
 
-waiting_states = ["QUEUED", "HELD", "WAITING", "PENDING"]
+waiting_states = ['QUEUED', 'HELD', 'WAITING', 'PENDING']
 
 
-@register_scheduler("flux", error=error)
+@register_scheduler('flux', error=error)
 class FluxJobScheduler(PbsJobScheduler):
     def __init__(self):
         self._fexecutor = flux.job.FluxExecutor()
         self._submit_timeout = rt.runtime().get_option(
-            f"schedulers/@{self.registered_name}/job_submit_timeout"
+            f'schedulers/@{self.registered_name}/job_submit_timeout'
         )
 
     def emit_preamble(self, job):
@@ -44,19 +45,18 @@ class FluxJobScheduler(PbsJobScheduler):
         return []
 
     def submit(self, job):
-        """
-        Submit a job to the flux executor.
-        """
+        '''Submit a job to the flux executor.'''
+
         # Output and error files
-        script_prefix = job.script_filename.split(".")[0]
-        output = os.path.join(job.workdir, f"{script_prefix}.out")
-        error = os.path.join(job.workdir, f"{script_prefix}.err")
+        script_prefix = job.script_filename.split('.')[0]
+        output = os.path.join(job.workdir, f'{script_prefix}.out')
+        error = os.path.join(job.workdir, f'{script_prefix}.err')
 
         # Generate the flux job
         # Assume the filename includes a hashbang
         # flux does not support mem_mb, disk_mb
         fluxjob = JobspecV1.from_command(
-            command=["/bin/bash", job.script_filename],
+            command=['/bin/bash', job.script_filename],
             num_tasks=job.num_tasks_per_core or 1,
             cores_per_task=job.num_cpus_per_task or 1,
         )
@@ -79,6 +79,7 @@ class FluxJobScheduler(PbsJobScheduler):
         if not job._flux_future.cancel():
             # This will raise JobException with event=cancel (on poll)
             flux.job.cancel(flux.Flux(), job._flux_future.jobid())
+
         job._is_cancelling = True
 
     def poll(self, *jobs):
@@ -91,42 +92,40 @@ class FluxJobScheduler(PbsJobScheduler):
 
         # Loop through active jobs and act on status
         for job in jobs:
-
             if job._flux_future.done():
                 # The exit code can help us determine if the job was successful
                 try:
                     exit_code = job._flux_future.result(0)
-
-                # Currently the only state we see is cancelled here
                 except flux.job.JobException:
-                    self.log(f"Job {job.jobid} was likely cancelled.")
-                    job._state = "CANCELLED"
+                    # Currently the only state we see is cancelled here
+                    self.log(f'Job {job.jobid} was likely cancelled.')
+                    job._state = 'CANCELLED'
                     job._cancelled = True
-
                 except RuntimeError:
                     # Assume some runtime issue (suspended)
-                    self.log(f"Job {job.jobid} was likely suspended.")
-                    job._state = "SUSPENDED"
+                    self.log(f'Job {job.jobid} was likely suspended.')
+                    job._state = 'SUSPENDED'
                 else:
                     # the job finished (but possibly with nonzero exit code)
                     if exit_code != 0:
                         self.log(
-                            f"Job {job.jobid} did not finish successfully")
-                    job._state = "COMPLETED"
-                job._completed = True
+                            f'Job {job.jobid} did not finish successfully')
 
+                    job._state = 'COMPLETED'
+
+                job._completed = True
             elif job.state in waiting_states and job.max_pending_time:
                 if time.time() - job.submit_time >= job.max_pending_time:
                     self.cancel(job)
                     job._exception = JobError(
-                        "maximum pending time exceeded", job.jobid
+                        'maximum pending time exceeded', job.jobid
                     )
-
-            # Otherwise, we are still running
             else:
-                job._state = "RUNNING"
+                # Otherwise, we are still running
+                job._state = 'RUNNING'
 
     def finished(self, job):
         if job.exception:
             raise job.exception
-        return job.state in ["COMPLETED", "CANCELLED", "SUSPENDED"]
+
+        return job.state in ['COMPLETED', 'CANCELLED', 'SUSPENDED']
