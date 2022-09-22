@@ -15,7 +15,7 @@ import unittests.utility as test_util
 from reframe.core.backends import (getlauncher, getscheduler)
 from reframe.core.environments import Environment
 from reframe.core.exceptions import (
-    JobError, JobNotStartedError, JobSchedulerError
+    ConfigError, JobError, JobNotStartedError, JobSchedulerError
 )
 from reframe.core.schedulers import Job
 from reframe.core.schedulers.slurm import _SlurmNode, _create_nodes
@@ -25,20 +25,14 @@ from reframe.core.schedulers.slurm import _SlurmNode, _create_nodes
 def launcher():
     return getlauncher('local')
 
-params = ['local', 'lsf', 'oar', 'pbs', 'sge', 'slurm', 'squeue', 'torque']
 
-# Add flux if we have it available
-try:
-    import flux
-    assert flux
-    params = ['flux'] + params
-except ImportError:
-    pass
-
-@pytest.fixture(params=params)
-
+@pytest.fixture(params=['flux', 'local', 'lsf', 'oar',
+                        'pbs', 'sge', 'slurm', 'squeue', 'torque'])
 def scheduler(request):
-    return getscheduler(request.param)
+    try:
+        return getscheduler(request.param)
+    except ConfigError as e:
+        pytest.skip(str(e))
 
 
 @pytest.fixture
@@ -157,8 +151,10 @@ def _expected_lsf_directives(job):
         f'#DW stage_in source=/foo',
     ])
 
+
 def _expected_flux_directives(job):
     return set()
+
 
 def _expected_flux_directives_minimal(job):
     return set()
@@ -449,7 +445,7 @@ def test_cancel(make_job, exec_ctx):
     prepare_job(minimal_job, 'sleep 30')
     t_job = time.time()
 
-    minimal_job.submit()    
+    minimal_job.submit()
     minimal_job.cancel()
 
     # We give some time to the local scheduler for the TERM signal to be

@@ -24,18 +24,16 @@ try:
     import flux.job
     from flux.job import JobspecV1
 except ImportError:
-    flux = None
+    error = 'no flux Python bindings found'
+else:
+    error = None
 
 waiting_states = ["QUEUED", "HELD", "WAITING", "PENDING"]
 
 
-@register_scheduler("flux")
+@register_scheduler("flux", error=error)
 class FluxJobScheduler(PbsJobScheduler):
     def __init__(self):
-        if not flux:
-            raise JobSchedulerError(
-                "Cannot import flux. Is a cluster available to you with Python bindings?"
-            )
         self._fexecutor = flux.job.FluxExecutor()
         self._submit_timeout = rt.runtime().get_option(
             f"schedulers/@{self.registered_name}/job_submit_timeout"
@@ -112,7 +110,8 @@ class FluxJobScheduler(PbsJobScheduler):
                 else:
                     # the job finished (but possibly with nonzero exit code)
                     if exit_code != 0:
-                        self.log(f"Job {job.jobid} did not finish successfully")
+                        self.log(
+                            f"Job {job.jobid} did not finish successfully")
                     job._state = "COMPLETED"
                 job._completed = True
 
