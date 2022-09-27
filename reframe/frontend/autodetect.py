@@ -59,7 +59,7 @@ class _copy_reframe:
         return self._workdir
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        pass  # osext.rmtree(self._workdir)
+        osext.rmtree(self._workdir)
 
 
 def _subschema(fragment):
